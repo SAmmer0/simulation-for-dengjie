@@ -4,7 +4,8 @@ __author__ = 'Mercury'
 import os
 import re
 import sys
-
+import numpy as np
+import pylab as pl
 import xlrd
 import datetime
 
@@ -256,51 +257,51 @@ if __name__ == '__main__':
         trade_log.write(name_this)
         trade_log.write('\n')
 
-        # 作图流程
-#        pl.figure(figsize=(60, 10), dpi=80)       # 设置图的长宽
-#        x_axle = np.linspace(0, len(str_times), len(str_times))     # 设置x轴
-#
- #       up_constrain = [constrain * i for i in sd_msgs]     # 设置平仓上界列表
-  #      up_trigger = [trigger * i for i in sd_msgs]     # 设置开仓上界列表
-   #     bottom_trigger = [-trigger * i for i in sd_msgs]        # 设置开仓下界列表
-    #    bottom_constrain = [-constrain * i for i in sd_msgs]        # 设置平仓下界列表
-#
- #       diff_curve = np.array(diff_msgs)        # 将价差序列列表转换为np列表
-  #      up_constrain_curve = np.array(up_constrain)     # 设置平仓上界列表
-   #     up_trigger_curve = np.array(up_trigger)     # 设置建仓上界列表
-    #    zero_curve = np.array([0] * len(str_times))         # 设置横轴列表
-     #   bottom_trigger_curve = np.array(bottom_trigger)        # 设置建仓下界列表
-      #  bottom_constrain_curve = np.array(bottom_constrain)        # 设置平仓下界列表
-#
- #       pl.xlim(x_axle.min() * 1.1, x_axle.max() * 1.1)     # 设定x轴的画图范围
-  #      # 设置x轴的标记
-   #     pl.xticks([j for j in range(0, len(str_times), 30)], [str_times[j] for j in range(0, len(str_times), 30)])
-#
- #       pl.ylim(min(bottom_constrain_curve.min(), diff_curve.min()) * 1.5,        # 设置y轴的画图范围
-  #              max(up_constrain_curve.max(), diff_curve.max()) * 1.2)
-   #     pl.yticks([-0.2, 0, 0.2],        # 设置y轴的标记
-    #              [r'$-0.2$', r'$0$', r'$0.2$'])
-#
- #       # 画出价差序列曲线
-  #      pl.plot(x_axle, diff_curve, color='blue', linewidth=1.5,
-   #             linestyle='-', label='diff_curve')
-    #    # 画出平仓上界曲线
-     #   pl.plot(x_axle, up_constrain_curve, color='red', linewidth=1,
-      #          linestyle='-.', label='constrain')
+         #作图流程
+        pl.figure(figsize=(60, 10), dpi=80)       # 设置图的长宽
+        x_axle = np.linspace(0, len(str_times), len(str_times))     # 设置x轴
+
+        up_constrain = [constrain * i for i in sd_msgs]     # 设置平仓上界列表
+        up_trigger = [trigger * i for i in sd_msgs]     # 设置开仓上界列表
+        bottom_trigger = [-trigger * i for i in sd_msgs]        # 设置开仓下界列表
+        bottom_constrain = [-constrain * i for i in sd_msgs]        # 设置平仓下界列表
+
+        diff_curve = np.array(diff_msgs)        # 将价差序列列表转换为np列表
+        up_constrain_curve = np.array(up_constrain)     # 设置平仓上界列表
+        up_trigger_curve = np.array(up_trigger)     # 设置建仓上界列表
+        zero_curve = np.array([0] * len(str_times))         # 设置横轴列表
+        bottom_trigger_curve = np.array(bottom_trigger)        # 设置建仓下界列表
+        bottom_constrain_curve = np.array(bottom_constrain)        # 设置平仓下界列表
+
+        pl.xlim(x_axle.min() * 1.1, x_axle.max() * 1.1)     # 设定x轴的画图范围
+        # 设置x轴的标记
+        pl.xticks([j for j in range(0, len(str_times), 30)], [str_times[j] for j in range(0, len(str_times), 30)])
+
+        pl.ylim(min(bottom_constrain_curve.min(), diff_curve.min()) * 1.5,        # 设置y轴的画图范围
+                max(up_constrain_curve.max(), diff_curve.max()) * 1.2)
+        pl.yticks([-0.2, 0, 0.2],        # 设置y轴的标记
+                  [r'$-0.2$', r'$0$', r'$0.2$'])
+
+        # 画出价差序列曲线
+        pl.plot(x_axle, diff_curve, color='blue', linewidth=1.5,
+                linestyle='-', label='diff_curve')
+        # 画出平仓上界曲线
+        pl.plot(x_axle, up_constrain_curve, color='red', linewidth=1,
+                linestyle='-.', label='constrain')
         # 画出开仓上界曲线
-       # pl.plot(x_axle, up_trigger_curve, color='green', linewidth=1,
-        #        linestyle='--', label='trigger')
-        ## 画出横轴
-#        pl.plot(x_axle, zero_curve, color='black', linewidth=1, linestyle='-')
- #       # 画出开仓下界曲线
-  #      pl.plot(x_axle, bottom_trigger_curve, color='green', linewidth=1, linestyle='--')
+        pl.plot(x_axle, up_trigger_curve, color='green', linewidth=1,
+                linestyle='--', label='trigger')
+        # 画出横轴
+        pl.plot(x_axle, zero_curve, color='black', linewidth=1, linestyle='-')
+        # 画出开仓下界曲线
+        pl.plot(x_axle, bottom_trigger_curve, color='green', linewidth=1, linestyle='--')
         # 画出平仓下界曲线
-   #     pl.plot(x_axle, bottom_constrain_curve, color='red', linewidth=1, linestyle='--')
-    #    # 设置曲线说明
-     #   pl.legend(loc='upper right')
+        pl.plot(x_axle, bottom_constrain_curve, color='red', linewidth=1, linestyle='--')
+        # 设置曲线说明
+        pl.legend(loc='upper right')
 
         # 显示图片
-      #  pl.show()
+        pl.show()
 
         ultimate_revenue, ultimate_cost = trade_iter(diff_msgs, sd_msgs, stocks, str_times)
         total_revenue += ultimate_revenue
