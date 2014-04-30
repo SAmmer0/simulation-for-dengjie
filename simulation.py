@@ -11,8 +11,8 @@ import datetime
 
 
 def read_file(file_name, file_path):
-    '''用于读取excel中的数据文件，最终依次返回价差序列、标准差和价格以及时间信息，
-    即依次返回diff_msg, sd_msg, price_a, price_h, time_msg'''
+    '''用于读取excel中的数据文件，最终依次返回价差序列、标准差和价格、时间信息、交易股票名称以及beta系数信息，
+    即依次返回diff_msg, sd_msg, price_a, price_h, time_msg, name_msg, beta_msg'''
     # 打开数据文件
     os.chdir(file_path)
     input_file = xlrd.open_workbook(file_name)
@@ -39,287 +39,286 @@ def read_file(file_name, file_path):
 def trans_time(time_msg):
     '''用于将读取的数据文件中的日期数据转换为更易于理解的日期信息,返回日期的字符串数组'''
     start_date = datetime.date(1899, 12, 31).toordinal() - 1
-    dict_date = []
+    list_date = []
     for date_data in time_msg:
         if isinstance(date_data, float):
             date_data = int(date_data)
         d = datetime.date.fromordinal(start_date + date_data)
-        dict_date.append(d.strftime('%Y-%m-%d'))
-    return dict_date
+        list_date.append(d.strftime('%Y-%m-%d'))
+    return list_date
 
 
-def get_xls_file(path):     # 从文件路径下读取所有的xls文件，并将文件名存入字典
+def get_xls_file(path):
+    '''从文件路径下读取所有的xls文件，并将文件名存入列表'''
     dir_file = os.listdir(path)
     pattern = re.compile(r'.*\.xlsx*$')
-    dict_xls = []
+    list_xls = []
     for f in dir_file:
-        dict_xls.append(pattern.findall(f))
-    result = [dict_xls[k][0] for k in range(len(dict_xls))
-              if len(dict_xls[k]) != 0]
+        list_xls.append(pattern.findall(f))
+    result = [list_xls[k][0] for k in range(len(list_xls))
+              if len(list_xls[k]) != 0]
     return result
 
 
-# 尝试运行，以及模拟交易的逻辑判断，收益分析部分
-if __name__ == '__main__':
-    # 从文件中获取数据
-    reload(sys)
+def diff_div_sd(diff_list, sd_list):
+    '''计算价差序列除以标准差序列得到的结果，以列表的形式返回'''
+    diff_div_sd_list = [diff_list[i]/sd_list[i] for i in range(len(diff_list))]
+    return diff_div_sd_list
+
+
+def trade_begin(price_dict, buy_item, sell_item, beta_dict,
+                trade_number, trade_cost_total, trade_log_list,
+                trade_cost_rate, trade_date):
+    '''开始交易的函数，计算买卖股票的数量及其相应的交易成本，
+    将交易开始日期添加到交易日志列表中，并设置交易状态，返回
+    cost_this, cost_total, trade_log_list, trade_state, in_trade'''
+    buy = price_dict[buy_item][trade_date] * trade_number * beta_dict[buy_item]
+    sell = price_dict[sell_item][trade_date] * trade_number * beta_dict[sell_item]
+    cost_this = (buy + sell) * trade_cost_rate + buy        # 计算本次的交易成本
+    new_trade_cost_total = trade_cost_total + cost_this     # 计算总的交易成本
+
+    trade_state = {'shba': False, 'sabh': False}        # 初始化交易状态细节的字典
+    if buy_item == 'a':             # 设置交易状态细节
+        trade_state['shba'] = True
+    else:
+        trade_state['sabh'] = True
+    in_trade = True         # 设置交易状态
+
+    trade_log_list.append([trade_date])        # 写入交易日志列表
+    trade_log_list.append[-1].append(buy_item)
+
+    return cost_this, new_trade_cost_total, trade_log_list, trade_state, in_trade
+
+
+def trade_end(price_dict, trade_state,
+              beta_dict, trade_number, trade_cost_total,
+              trade_cost_this, revenue_total, trade_log_list,
+              trade_date, trade_cost_rate):
+    '''交易结束的函数，计算买卖股票的数量及其 交易成本，以及交易利润，
+    将交易结束日期、交易成本、交易收益添加到交易日志列表中，并设置交易状态，
+    返回 cost_total, revenue_total, trade_log_list, trade_state, in_trade'''
+    if trade_state['sabh']:
+        buy_item = 'a'
+        sell_item = 'h'
+    else:
+        buy_item = 'h'
+        sell_item = 'a'
+
+    buy = price_dict[buy_item][trade_date] * trade_number * beta_dict[buy_item]
+    sell = price_dict[sell_item][trade_date] * trade_number * beta_dict[sell_item]
+
+    cost_this = (buy + sell) * trade_cost_rate + buy + trade_cost_this          # 计算整个完整交易的成本
+    new_trade_cost_total = trade_cost_total + (buy + sell) * trade_cost_rate + buy         # 计算至今为止的交易成本
+
+    if buy_item == 'a':
+        trade_state['sabh'] = False
+    else:
+        trade_state['shba'] = False
+    in_trade = False
+
+    last_trade_date = trade_log_list[-1][1]
+    revenue_this = (price_dict[buy_item][last_trade_date] - price_dict[buy_item][trade_date]) *\
+        trade_number * beta_dict[buy_item] +\
+        (price_dict[sell_item][trade_date] - price_dict[sell_item][last_trade_date]) *\
+        trade_number * beta_dict[buy_item]                              # 计算本次完整交易的收益
+    new_revenue_total = revenue_total + revenue_this        # 计算总的交易收益
+    rate_of_revenue = revenue_this / cost_this * 100
+
+    trade_log_list[-1].append(trade_date)           # 将交易信息添加到交易日志列表中
+    trade_log_list[-1].append(revenue_this)
+    trade_log_list[-1].append(rate_of_revenue)
+
+    return new_trade_cost_total, new_revenue_total, trade_log_list, trade_state, in_trade
+
+
+def print_log(output_path, total_trade_log_list,
+              cost_revenue_list, name_msg_list, file_name='trade_log'):
+    '''打印交易日志，包含所有的组合的交易日志'''
+    os.chdir(output_path)
+    file_name_txt = file_name + '.txt'
+    output_file = open(file_name_txt, 'w')
+
+    # 计算收益率以及所有的交易完成之后的总收益和收益率
+    total_rev = .0
+    total_cost = .0
+    for ith_trade in range(len(cost_revenue_list)):
+        rate_of_revenue = cost_revenue_list[1] / cost_revenue_list[0] * 100
+        total_rev += cost_revenue_list[1]
+        total_cost += cost_revenue_list[0]
+
+    for ith_trade in range(len(total_trade_log_list)):
+        output_file.write(name_msg_list[ith_trade])
+        output_file.write('\n')
+        for trade_list in total_trade_log_list[ith_trade]:
+            try:
+                if trade_list[1] == 'a':
+                    output_file.write('建仓时间：%s， 买A卖H\n') % (trade_list[0])
+                    output_file.write('平仓时间： %s， 卖A买H，本次收益为：%f，收益率为：%f%%\n')\
+                        % (trade_list[2], trade_list[3], trade_list[4])
+                else:
+                    output_file.write('建仓时间：%s，买H卖A') % (trade_list[0])
+                    output_file.write('平仓时间： %s， 卖H买A，本次收益为：%f，收益率为：%f%%\n')\
+                        % (trade_list[2], trade_list[3], trade_list[4])
+            except IOError as err:
+                print 'Error, unable to write log' + str(err)
+
+        output_file.write('''本次交易总收益为：%f，
+                            总的收益率为 %f%%/n''') % (cost_revenue_list[1], rate_of_revenue[ith_trade])
+        output_file.write('\n')
+    output_file.write('总收益率为: %f，总收益率为：%f%%/n') % (total_rev, total_rev / total_cost * 100)
+    output_file.close()
+
+
+def plot_trade_procedure(diff_msg, sd_msg, constrain,
+                         trigger, output_path, name_msg,
+                         date_list):
+    '''用于画出价差序列曲线，触发以及终止交易的区间曲线'''
+    pl.figure(figsize=(60, 10), dpi=80)     # 设置图的长宽
+    x_axle = np.linspace(0, len(diff_msg), len(diff_msg))   # 设置x轴
+
+    up_constrain = np.array([i * constrain for i in sd_msg])        # 设置终止上界列表
+    up_trigger = np.array([i * trigger for i in sd_msg])        # 设置触发上界列表
+    bottom_trigger = np.array([i * (-trigger) for i in sd_msg])     # 设置触发下界列表
+    bottom_constrain = np.array([i * (-constrain) for i in sd_msg])     # 设置终止下界列表
+    diff_curve = np.array(diff_msg)     # 设置价差序列列表
+
+    pl.xlim(x_axle.min(), x_axle.max() * 1.2)       # 设置x轴的画图范围
+    # 设置x轴的标记
+    pl.xticks([j for j in range(0, len(date_list), 22)], [date_list[j] for j in range(0, len(date_list), 22)])
+
+    pl.ylim(min(bottom_constrain.min(), diff_curve.min()) * 1.5,
+            max(up_constrain.max(), diff_curve.max()) * 1.5)        # 设置y轴的画图范围
+    pl.yticks([-0.2, 0, 0.2], [r'$-0.2$', r'$0$', r'$0.2$'])        # 设置y轴的标记
+
+    # 画出价差序列
+    pl.plot(x_axle, diff_curve, color='blue', linewidth=1.5,
+            linestyle='-', label='diff_curve')
+    # 画出平仓上界曲线
+    pl.plot(x_axle, up_constrain, color='red', linewidth=1,
+            linestyle='--', label='constrain')
+    # 画出触发上界曲线
+    pl.plot(x_axle, up_trigger, color='green', linewidth=1,
+            linestyle='--', label='trigger')
+    # 画出平仓下界曲线
+    pl.plot(x_axle, bottom_constrain, color='red', linewidth=1,
+            linestyle='--')
+    # 画出触发下界曲线
+    pl.plot(x_axle, bottom_trigger, color='green', linewidth=1,
+            linestyle='--')
+
+    # 设置曲线说明的位置
+    pl.legend(loc='upper right')
+
+    # 调节轴线的位置
+    ax = pl.gca()
+    ax.spines['right'].set_color('none')        # 去除右边轴线
+    ax.spines['top'].set_color('none')      # 去除上方轴线
+    ax.xaxis.set_ticks_position('bottom')
+    ax.spines['bottom'].set_position(('data', 0))
+    ax.yaxis.set_ticks_position('left')
+    ax.spines['left'].set_position(('data', 0))
+
+    # 保存图片
+    file_save = output_path + '\\' + name_msg + '.jpg'
+    pl.save(file_save)
+
+
+def trade_iter(input_path, output_path):
     sys.setdefaultencoding('utf-8')
-    dir_path = r'C:\Users\Mercury\Desktop\project'
-    list_file = get_xls_file(dir_path)
+    xls_name_list = get_xls_file(input_path)
 
-    # 设置阀值
-    constrain = 1     # 终止的上下限
-    trigger = 0.9      # 触发建仓的阀值
+    # 初始化全局变量
+    constrain = 3.0
+    trigger = 1.5
+    trade_num = 100
+    rate_of_cost = 0.0004
+    name_msg_list = []
+    total_cost_revenue_list = []
 
-    # 定义一些需要使用的全局变量
-    beta = 0
-    cost_this = 0
-    cost_total = 0
-    trade_cost = 0.002
-    in_trade = False        # 判断是否已经建仓
-    sabh = False        # 判断建仓的方式sell a buy h
-    shba = False        # 判断建仓的方式sell h buy a
-    total_revenue = 0       # 所有交易完成之后计算总的利润
-    total_cost = 0      # 所有交易完成后计算所有的成本
+    for xls_name in xls_name_list:      # 文件处理循环
+        # 获取文件中的数据
+        diff_msg, sd_msg, price_a, price_h, time_msg, name_msg, beta_msg = read_file(xls_name, input_path)
 
-     # 交易信息以文件的方式输出
-    log_file = 'trade_log.txt'
-    trade_log = open(log_file, "w")
+        # 将交易的两只股票名加入列表，方便打印
+        name_msg_list.append(name_msg)
 
-    # 交易循环
-    def trade_iter(diff_msg, sd_msg, stocks_price, str_time):
-        # 具有global属性的数值初始化
-        len_of_date = len(str_time)
-        revenue = 0
-        buy_a = 0
-        sell_a = 0
-        buy_h = 0
-        sell_h = 0
-        number = 100        # 买的基础数量
+        # 计算价差序列除以标准差序列
+        diff_div_sd_list = diff_div_sd(diff_msg, sd_msg)
+        # 将日期型数据转换为字符
+        time_str = trans_time(time_msg)
+        # 设置beta系数字典
+        beta_dict = {'a': 1, 'h': beta_msg}
+        stocks_price_dict = {'a': price_a, 'h': price_h}
 
-        # 买卖的数量比函数，如果为a股则返回1，如果为h股则返回1.9
-        def beta(item):
-            if item == 'a':
-                return 1.0
+        # 初始化域变量
+        in_trade = False        # 用于判断是否处于交易中
+        trade_state = {'sabh': False, 'shba': False}        # 用于判断所处的交易状态
+        cost_total = 0
+        revenue_total = 0
+        trade_log_list = []     # 用于记录交易记录
+        total_trade_log_list = []
+        len_trade_day = len(time_str)       # 总的交易天数
+
+        # 日期循环
+        for ith_day in range(len_trade_day):
+            if not in_trade:
+                if trigger < diff_div_sd_list[ith_day] < constrain:
+                    cost_this, cost_total, trade_log_list, trade_state, in_trade = trade_begin(stocks_price_dict,
+                                                                                               'a', 'h', beta_dict,
+                                                                                               trade_num, cost_total,
+                                                                                               trade_log_list,
+                                                                                               rate_of_cost, ith_day)
+                elif -constrain < diff_div_sd_list < -trigger:
+                    cost_this, cost_total, trade_log_list, trade_state, in_trade = trade_begin(stocks_price_dict,
+                                                                                               'h', 'a', beta_dict,
+                                                                                               trade_num, cost_total,
+                                                                                               trade_log_list,
+                                                                                               rate_of_cost, ith_day)
             else:
-                global beta
-                return beta
-
-        # 建仓函数
-        def trade_begin(buy_item, sell_item, date):
-            buy = stocks_price[buy_item][date] * number * beta(buy_item)
-            sell = stocks_price[sell_item][date] * number * beta(sell_item)
-
-            global cost_this
-            global cost_total
-            global in_trade
-            global shba
-            global sabh
-            cost_this += (buy + (buy + sell) * trade_cost)
-            cost_total += cost_this
-            in_trade = True
-            if buy_item == 'a':
-                shba = True
-            else:
-                sabh = True
-            return buy, sell
-
-        # 平仓函数
-        def trade_end(buy_item, sell_item, date):
-            buy = stocks_price[buy_item][date] * number * beta(buy_item)
-            sell = stocks_price[sell_item][date] * number * beta(sell_item)
-
-            global cost_this
-            global cost_total
-            global in_trade
-            global shba
-            global sabh
-            cost_this += (buy + (buy + sell) * trade_cost)
-            cost_total += (buy + (buy + sell) * trade_cost)
-            in_trade = False
-
-            if buy_item == 'a':
-                sabh = False
-            else:
-                shba = False
-            return buy, sell
-
-        for trade_date in range(len_of_date):
-            diff_divide_sd = diff_msg[trade_date] / sd_msg[trade_date]        # 计算价差序列是标准差的多少倍
-
-            if not in_trade:        # 建仓
-                if trigger < diff_divide_sd < constrain:     # 判断是否在买A卖H的建仓区间内
-                    buy_a, sell_h = trade_begin('a', 'h', trade_date)
-                    trade_log.write('建仓时间：%s，做多A做空H\n' % str_time[trade_date])
-                elif -constrain < diff_divide_sd < -trigger:       # 判断是否在卖A买H的建仓区间内
-                    buy_h, sell_a = trade_begin('h', 'a', trade_date)
-                    trade_log.write('建仓时间：%s，做多H做空A\n' % str_time[trade_date])
-            else:       # 平仓
-                if trade_date == len_of_date - 1:     # 如果已经到了模拟的最后一天不管如何都收盘
-                    if shba:        # 已经买A卖H，则反向操作
-                        buy_h, sell_a = trade_end('h', 'a', trade_date)
-                        global cost_this
-                        revenue_this = (sell_a - buy_a) + (sell_h - buy_h)\
-                            - (sell_a + buy_a + sell_h + buy_h) * trade_cost
-                        revenue += revenue_this
-                        rate_of_revenue = revenue_this / cost_this * 100
-                        cost_this = 0
-                        trade_log.write('平仓时间：%s，本次交易收益 %f，本次交易收益率 %f%%\n'
-                                        % (str_time[trade_date], revenue_this, rate_of_revenue))
-                    elif sabh:      # 已经卖A买H，则反向操作
-                        buy_a, sell_h = trade_end('a', 'h', trade_date)
-                        global cost_this
-                        revenue_this = (sell_a - buy_a) + (sell_h - buy_h)\
-                            - (sell_a + buy_a + sell_h + buy_h) * trade_cost
-                        revenue += revenue_this
-                        rate_of_revenue = revenue_this / cost_this * 100
-                        cost_this = 0
-                        trade_log.write('平仓时间：%s，本次交易收益 %f，本次交易收益率 %f%%\n'
-                                        % (str_time[trade_date], revenue_this, rate_of_revenue))
-                elif trigger < diff_divide_sd < constrain or -constrain < diff_divide_sd < -trigger:
+                if ith_day == len_trade_day - 1:  # 如果此时处于交易的最后一天，则无论如何都平仓
+                    cost_total, revenue_total, trade_log_list, trade_state, in_trade = trade_end(stocks_price_dict,
+                                                                                                 trade_state,
+                                                                                                 beta_dict,
+                                                                                                 trade_num,
+                                                                                                 cost_total,
+                                                                                                 cost_this,
+                                                                                                 revenue_total,
+                                                                                                 trade_log_list,
+                                                                                                 ith_day,
+                                                                                                 rate_of_cost)
+                elif diff_msg[ith_day] * diff_msg[ith_day - 1] <= 0:  # 判断价差曲线是否突破横轴
+                    cost_total, revenue_total, trade_log_list, trade_state, in_trade = trade_end(stocks_price_dict,
+                                                                                                 trade_state,
+                                                                                                 beta_dict,
+                                                                                                 trade_num,
+                                                                                                 cost_total,
+                                                                                                 cost_this,
+                                                                                                 revenue_total,
+                                                                                                 trade_log_list,
+                                                                                                 ith_day,
+                                                                                                 rate_of_cost)
+                elif diff_div_sd_list[ith_day] < -constrain or diff_div_sd_list[ith_day] > constrain:
+                    # 判断价差序列除标准差序列的结果是否突破了波动的上下界
+                    cost_total, revenue_total, trade_log_list, trade_state, in_trade = trade_end(stocks_price_dict,
+                                                                                                 trade_state,
+                                                                                                 beta_dict,
+                                                                                                 trade_num,
+                                                                                                 cost_total,
+                                                                                                 cost_this,
+                                                                                                 revenue_total,
+                                                                                                 trade_log_list,
+                                                                                                 ith_day,
+                                                                                                 rate_of_cost)
+                else:
                     continue
 
-                # 判断是否需要在今天或者明天平仓
-                elif diff_msg[trade_date] * diff_msg[trade_date + 1] < 0:
-                    square_diff = pow(diff_msg[trade_date], 2) - pow(diff_msg[trade_date + 1], 2)
-                    if square_diff >= 0:
-                        continue
-                    else:
-                        if shba:        # 已经买A卖H，则反向操作
-                            buy_h, sell_a = trade_end('h', 'a', trade_date)
-                            global cost_this
-                            revenue_this = (sell_a - buy_a) + (sell_h - buy_h)\
-                                - (sell_a + buy_a + sell_h + buy_h) * trade_cost
-                            revenue += revenue_this
-                            rate_of_revenue = revenue_this / cost_this * 100
-                            cost_this = 0
-                            trade_log.write('平仓时间：%s，本次交易收益 %f，本次交易收益率 %f%%\n'
-                                            % (str_time[trade_date], revenue_this, rate_of_revenue))
-                        elif sabh:      # 已经卖A买H，则反向操作
-                            buy_a, sell_h = trade_end('a', 'h', trade_date)
-                            global cost_this
-                            revenue_this = (sell_a - buy_a) + (sell_h - buy_h)
-                            revenue += revenue_this
-                            rate_of_revenue = revenue_this / cost_this * 100
-                            cost_this = 0
-                            trade_log.write('平仓时间：%s，本次交易收益 %f，本次交易收益率 %f%%\n'
-                                            % (str_time[trade_date], revenue_this, rate_of_revenue))
-                elif diff_msg[trade_date] * diff_msg[trade_date - 1] < 0:
-                    square_diff = pow(diff_msg[trade_date], 2) - pow(diff_msg[trade_date - 1], 2)
-                    if square_diff >= 0:
-                        if shba:        # 已经买A卖H，则反向操作
-                            buy_h, sell_a = trade_end('h', 'a', trade_date)
-                            global cost_this
-                            revenue_this = (sell_a - buy_a) + (sell_h - buy_h)\
-                                - (sell_a + buy_a + sell_h + buy_h) * trade_cost
-                            revenue += revenue_this
-                            rate_of_revenue = revenue_this / cost_this * 100
-                            cost_this = 0
-                            trade_log.write('平仓时间：%s，本次交易收益 %f，本次交易收益率 %f%%\n'
-                                            % (str_time[trade_date], revenue_this, rate_of_revenue))
-                        elif sabh:      # 已经卖A买H，则反向操作
-                            buy_a, sell_h = trade_end('a', 'h', trade_date)
-                            global cost_this
-                            revenue_this = (sell_a - buy_a) + (sell_h - buy_h)
-                            revenue += revenue_this
-                            rate_of_revenue = revenue_this / cost_this * 100
-                            cost_this = 0
-                            trade_log.write('平仓时间：%s，本次交易收益 %f，本次交易收益率 %f%%\n'
-                                            % (str_time[trade_date], revenue_this, rate_of_revenue))
-                    else:
-                        continue
-                elif diff_divide_sd > constrain or diff_divide_sd < -constrain:
-                    if shba:        # 已经买A卖H，则反向操作
-                        buy_h, sell_a = trade_end('h', 'a', trade_date)
-                        global cost_this
-                        revenue_this = (sell_a - buy_a) + (sell_h - buy_h)\
-                            - (sell_a + buy_a + sell_h + buy_h) * trade_cost
-                        revenue += revenue_this
-                        rate_of_revenue = revenue_this / cost_this * 100
-                        cost_this = 0
-                        trade_log.write('平仓时间：%s，本次交易收益 %f，本次交易收益率 %f%%\n'
-                                        % (str_time[trade_date], revenue_this, rate_of_revenue))
-                    elif sabh:      # 已经卖A买H，则反向操作
-                        buy_a, sell_h = trade_end('a', 'h', trade_date)
-                        revenue_this = (sell_a - buy_a) + (sell_h - buy_h)
-                        revenue += revenue_this
-                        rate_of_revenue = revenue_this / cost_this * 100
-                        cost_this = 0
-                        trade_log.write('平仓时间：%s，本次交易收益 %f，本次交易收益率 %f%%\n'
-                                        % (str_time[trade_date], revenue_this, rate_of_revenue))
-        return revenue, cost_total
-    for xls_file in list_file:
-        diff_msgs, sd_msgs, price_as, price_hs, time_msgs, name_this, beta_this = read_file(xls_file, dir_path)
-        global beta
-        beta = beta_this
-        str_times = trans_time(time_msgs)
-        stocks = {'a': price_as, 'h': price_hs}
-        trade_log.write(name_this)
-        trade_log.write('\n')
+        total_trade_log_list.append(trade_log_list)     # 将日志列表加入总的列表方便一起打印
+        total_cost_revenue_list.append([cost_total, revenue_total])
+        plot_trade_procedure(diff_msg, sd_msg, constrain, trigger, output_path, name_msg, time_str)     # 作图
 
-         #作图流程
-        pl.figure(figsize=(60, 10), dpi=80)       # 设置图的长宽
-        x_axle = np.linspace(0, len(str_times), len(str_times))     # 设置x轴
+    print_log(output_path, total_trade_log_list, total_cost_revenue_list, name_msg_list)
 
-        up_constrain = [constrain * i for i in sd_msgs]     # 设置平仓上界列表
-        up_trigger = [trigger * i for i in sd_msgs]     # 设置开仓上界列表
-        bottom_trigger = [-trigger * i for i in sd_msgs]        # 设置开仓下界列表
-        bottom_constrain = [-constrain * i for i in sd_msgs]        # 设置平仓下界列表
-
-        diff_curve = np.array(diff_msgs)        # 将价差序列列表转换为np列表
-        up_constrain_curve = np.array(up_constrain)     # 设置平仓上界列表
-        up_trigger_curve = np.array(up_trigger)     # 设置建仓上界列表
-        zero_curve = np.array([0] * len(str_times))         # 设置横轴列表
-        bottom_trigger_curve = np.array(bottom_trigger)        # 设置建仓下界列表
-        bottom_constrain_curve = np.array(bottom_constrain)        # 设置平仓下界列表
-
-        pl.xlim(x_axle.min() * 1.1, x_axle.max() * 1.1)     # 设定x轴的画图范围
-        # 设置x轴的标记
-        pl.xticks([j for j in range(0, len(str_times), 30)], [str_times[j] for j in range(0, len(str_times), 30)])
-
-        pl.ylim(min(bottom_constrain_curve.min(), diff_curve.min()) * 1.5,        # 设置y轴的画图范围
-                max(up_constrain_curve.max(), diff_curve.max()) * 1.2)
-        pl.yticks([-0.2, 0, 0.2],        # 设置y轴的标记
-                  [r'$-0.2$', r'$0$', r'$0.2$'])
-
-        # 画出价差序列曲线
-        pl.plot(x_axle, diff_curve, color='blue', linewidth=1.5,
-                linestyle='-', label='diff_curve')
-        # 画出平仓上界曲线
-        pl.plot(x_axle, up_constrain_curve, color='red', linewidth=1,
-                linestyle='-.', label='constrain')
-        # 画出开仓上界曲线
-        pl.plot(x_axle, up_trigger_curve, color='green', linewidth=1,
-                linestyle='--', label='trigger')
-        # 画出横轴
-        pl.plot(x_axle, zero_curve, color='black', linewidth=1, linestyle='-')
-        # 画出开仓下界曲线
-        pl.plot(x_axle, bottom_trigger_curve, color='green', linewidth=1, linestyle='--')
-        # 画出平仓下界曲线
-        pl.plot(x_axle, bottom_constrain_curve, color='red', linewidth=1, linestyle='--')
-        # 设置曲线说明
-        pl.legend(loc='upper right')
-
-        # 显示图片
-        pl.show()
-
-        ultimate_revenue, ultimate_cost = trade_iter(diff_msgs, sd_msgs, stocks, str_times)
-        total_revenue += ultimate_revenue
-        total_cost += ultimate_cost
-
-        if ultimate_cost == 0:
-            trade_log.write('最终收益及总收益率均为0\n')
-        else:
-            trade_log.write('最终收益：%f，总收益率为：%f%%\n'
-                            % (ultimate_revenue, ultimate_revenue / ultimate_cost * 100))
-        trade_log.write('\n')
-        # 重新初始化一些全局变量
-        cost_total = 0
-        cost_this = 0
-        sabh = False
-        shba = False
-        in_trade = False
-
-    trade_log.write('所有交易最终的总收益：%f, 总收益率为：%f%%\n'
-                    % (total_revenue, total_revenue / total_cost * 100))
-    trade_log.close()
+if __name__ == '__main__':
+    path_input = r'C:\Users\Mercury\Desktop\stock\second'
+    path_output = r'C:\Users\Mercury\Desktop\stock\second'
+    trade_iter(path_input, path_output)
