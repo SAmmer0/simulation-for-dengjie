@@ -186,7 +186,7 @@ def plot_trade_procedure(diff_msg, sd_msg, constrain,
                          trigger, output_path, name_msg,
                          date_list):
     '''用于画出价差序列曲线，触发以及终止交易的区间曲线'''
-    pl.figure(figsize=(60, 10), dpi=80)     # 设置图的长宽
+    pl.figure(figsize=(30, 10), dpi=80)     # 设置图的长宽
     x_axle = np.linspace(0, len(diff_msg), len(diff_msg))   # 设置x轴
 
     up_constrain = np.array([i * constrain for i in sd_msg])        # 设置终止上界列表
@@ -243,7 +243,7 @@ def trade_iteration(input_path, output_path):
 
     # 初始化全局变量
     constrain = 3.0
-    trigger = 0.9
+    trigger = 1.5
     trade_num = 100
     rate_of_cost = 0.0004
     cost = .0       # 所有交易的总成本
@@ -279,13 +279,13 @@ def trade_iteration(input_path, output_path):
                     continue
                 elif trigger < diff_div_sd_list[ith_day] < constrain:
                     cost_this, cost_total, trade_log_list, trade_state, in_trade = trade_begin(stocks_price_dict,
-                                                                                               'a', 'h', beta_dict,
+                                                                                               'h', 'a', beta_dict,
                                                                                                trade_num, cost_total,
                                                                                                trade_log_list,
                                                                                                rate_of_cost, ith_day)
                 elif -constrain < diff_div_sd_list[ith_day] < -trigger:
                     cost_this, cost_total, trade_log_list, trade_state, in_trade = trade_begin(stocks_price_dict,
-                                                                                               'h', 'a', beta_dict,
+                                                                                               'a', 'h', beta_dict,
                                                                                                trade_num, cost_total,
                                                                                                trade_log_list,
                                                                                                rate_of_cost, ith_day)
@@ -354,6 +354,6 @@ def trade_iteration(input_path, output_path):
     print_log_total(output_path, cost, rev)
 
 if __name__ == '__main__':
-    path_input = r'C:\Users\Mercury\Desktop\stock\second'
-    path_output = r'C:\Users\Mercury\Desktop\stock\second'
+    path_input = r'C:\Users\Mercury\Desktop\stock\project'
+    path_output = r'C:\Users\Mercury\Desktop\stock\project'
     trade_iteration(path_input, path_output)
