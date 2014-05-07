@@ -186,7 +186,7 @@ def plot_trade_procedure(diff_msg, sd_msg, constrain,
                          trigger, output_path, name_msg,
                          date_list):
     '''用于画出价差序列曲线，触发以及终止交易的区间曲线'''
-    pl.figure(figsize=(30, 10), dpi=80)     # 设置图的长宽
+    pl.figure(figsize=(30, 10), dpi=100)     # 设置图的长宽
     x_axle = np.linspace(0, len(diff_msg), len(diff_msg))   # 设置x轴
 
     up_constrain = np.array([i * constrain for i in sd_msg])        # 设置终止上界列表
@@ -194,15 +194,19 @@ def plot_trade_procedure(diff_msg, sd_msg, constrain,
     bottom_trigger = np.array([i * (-trigger) for i in sd_msg])     # 设置触发下界列表
     bottom_constrain = np.array([i * (-constrain) for i in sd_msg])     # 设置终止下界列表
     diff_curve = np.array(diff_msg)     # 设置价差序列列表
+    horizon_curve = np.array([0] * len(date_list))      # 设置横轴列表
 
     pl.xlim(x_axle.min(), x_axle.max() * 1.2)       # 设置x轴的画图范围
     # 设置x轴的标记
-    pl.xticks([j for j in range(0, len(date_list), 22)], [date_list[j] for j in range(0, len(date_list), 22)])
+    pl.xticks([j for j in range(0, len(date_list), 88)], [date_list[j] for j in range(0, len(date_list), 88)])
 
     pl.ylim(min(bottom_constrain.min(), diff_curve.min()) * 1.5,
             max(up_constrain.max(), diff_curve.max()) * 1.5)        # 设置y轴的画图范围
     pl.yticks([-0.2, 0, 0.2], [r'$-0.2$', r'$0$', r'$0.2$'])        # 设置y轴的标记
 
+    # 画出横轴
+    pl.plot(x_axle, horizon_curve, color='black', linewidth=1,
+            linestyle='-')
     # 画出价差序列
     pl.plot(x_axle, diff_curve, color='blue', linewidth=1.5,
             linestyle='-', label='diff_curve')
@@ -221,15 +225,6 @@ def plot_trade_procedure(diff_msg, sd_msg, constrain,
 
     # 设置曲线说明的位置
     pl.legend(loc='upper right')
-
-    # 调节轴线的位置
-    ax = pl.gca()
-    ax.spines['right'].set_color('none')        # 去除右边轴线
-    ax.spines['top'].set_color('none')      # 去除上方轴线
-    ax.xaxis.set_ticks_position('bottom')
-    ax.spines['bottom'].set_position(('data', 0))
-    ax.yaxis.set_ticks_position('left')
-    ax.spines['left'].set_position(('data', 0))
 
     # 保存图片
     file_save = output_path + '\\' + name_msg + '.jpg'
@@ -354,6 +349,6 @@ def trade_iteration(input_path, output_path):
     print_log_total(output_path, cost, rev)
 
 if __name__ == '__main__':
-    path_input = r'C:\Users\Mercury\Desktop\stock\project'
-    path_output = r'C:\Users\Mercury\Desktop\stock\project'
+    path_input = r'C:\Users\Mercury\Desktop\stock\second'
+    path_output = r'C:\Users\Mercury\Desktop\stock\second'
     trade_iteration(path_input, path_output)
